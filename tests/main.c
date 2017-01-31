@@ -5,16 +5,16 @@
 #include <diffstats/diffstats.h>
 
 static void test_check_for_diff_header(void) {
-  int ok = diff_stats_is_diff_header("diff", 0);
+  int ok = diff_stats_is_diff_header("diff");
   assert(ok);
-  int fail = !diff_stats_is_diff_header("diff", 1);
+  int fail = !diff_stats_is_diff_header(" diff");
   assert(fail);
 }
 
 static void test_check_for_hunk_header(void) {
-  int ok = diff_stats_is_hunk_header("@@", 0);
+  int ok = diff_stats_is_hunk_header("@@");
   assert(ok);
-  int fail = !diff_stats_is_hunk_header("@@", 1);
+  int fail = !diff_stats_is_hunk_header(" @@");
   assert(fail);
 }
 
@@ -32,6 +32,8 @@ static void test_simple(void) {
   int err = 0;
   struct diff_stats_t* st = diff_stats_parser(diff_simple_test, &count, &err);
   assert(st[0].starts_at == 0);
+  assert(st[0].additions == 1);
+  assert(st[0].deletions == 1);
   assert(st[0].count == 1);
   free(st);
 }
@@ -69,6 +71,8 @@ static void test_with_2_hunks(void) {
   int err = 0;
   struct diff_stats_t* st = diff_stats_parser(diff_with_2_hunks_test, &count, &err);
   assert(st[0].starts_at == 0);
+  assert(st[0].additions == 4);
+  assert(st[0].deletions == 4);
   assert(st[0].count == 2);
   free(st);
 }
@@ -93,8 +97,13 @@ static void test_mixed(void) {
   int err = 0;
   struct diff_stats_t* st = diff_stats_parser(diff_mixed_test, &count, &err);
   assert(st[0].starts_at == 0);
+  assert(st[0].additions == 1);
+  assert(st[0].deletions == 1);
   assert(st[0].count == 1);
+
   assert(st[1].starts_at == 77);
+  assert(st[1].additions == 1);
+  assert(st[1].deletions == 1);
   assert(st[1].count == 1);
   free(st);
 }
