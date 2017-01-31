@@ -5,8 +5,18 @@ enum diff_stats_err_t {
   HUNK_WITHOUT_DIFF = 1
 };
 
+enum diff_stats_line_t {
+  DIFF_NOTHING  = 0,
+  DIFF_HEADER   = 1,
+  HUNK_HEADER   = 2,
+  ADDITION_LINE = 3,
+  DELETION_LINE = 4
+};
+
 struct diff_stats_t {
   long  starts_at;
+  long  additions;
+  long  deletions;
   long  count;
   long  hunks;
   long* hunks_at;
@@ -18,7 +28,7 @@ struct diff_stats_t {
  * @param {long}  column - text column (updated every new line).
  * @return {int}
  */
-int diff_stats_is_diff_header(const char* text, long column);
+int diff_stats_is_diff_header(const char* text);
 
 /**
  * From the current point in text, is there a `@@`?
@@ -26,7 +36,14 @@ int diff_stats_is_diff_header(const char* text, long column);
  * @param {long}  column - text column (updated every new line).
  * @return {int}
  */
-int diff_stats_is_hunk_header(const char* text, long column);
+int diff_stats_is_hunk_header(const char* text);
+
+/**
+ * Find the type of the line.
+ * @param {const char*} text - text.
+ * @return {int}
+ */
+int diff_stats_line_type(const char* text);
 
 /**
  * Add a found hunk to the list.

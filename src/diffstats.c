@@ -5,6 +5,8 @@
 
 static struct diff_stats_t* diff_stats_prepare_item(struct diff_stats_t* d) {
   d->starts_at = -1;
+  d->additions =  0;
+  d->deletions =  0;
   d->count     =  0;
   d->hunks     = 10;
   d->hunks_at  = (long*)malloc(sizeof(long) * 10);
@@ -12,12 +14,26 @@ static struct diff_stats_t* diff_stats_prepare_item(struct diff_stats_t* d) {
   return d;
 }
 
-int diff_stats_is_diff_header(const char* text, long column) {
-  return *text == 'd' && strncmp(text, (char*)"diff", 4) == 0 && column == 0;
+int diff_stats_is_diff_header(const char* text) {
+  return (*text == 'd' && strncmp(text, (char*)"diff", 4) == 0);
 }
 
-int diff_stats_is_hunk_header(const char* text, long column) {
-  return *text == '@' && strncmp(text, (char*)"@@", 2) == 0 && column == 0;
+int diff_stats_is_hunk_header(const char* text) {
+  return (*text == '@' && strncmp(text, (char*)"@@", 2) == 0);
+}
+
+int diff_stats_line_type(const char* text) {
+  if (diff_stats_is_diff_header(text)) {
+    return DIFF_HEADER;
+  }
+  if (diff_stats_is_hunk_header(text)) {
+    return HUNK_HEADER;
+  }
+  switch (*text) {
+  case '-': { return DELETION_LINE; } break;
+  case '+': { return ADDITION_LINE; } break;
+  default:  { return DIFF_NOTHING;  } break;
+  }
 }
 
 void diff_stats_add_hunk_at(struct diff_stats_t* d, long i) {
@@ -53,10 +69,20 @@ void diff_stats_free(struct diff_stats_t* d, long count) {
   free(d);
 }
 
+char* diff_stats_find_hunk(const char* str) {
+  char* text = (char*)str;
+  while (*text && *(text + 1)) {
+    if (*text == '\n' && *(text + 1) == '@') {
+      break;
+    }
+    text++;
+  }
+  return text;
+}
+
 struct diff_stats_t* diff_stats_parser(const char* str, long* counter, int* err) {
   char* hold   = (char*)str;
   char* text   = hold;
-  long  column = 0;
   long  index  = 0;
   long  count  = 12;
   struct diff_stats_t* diff =
@@ -64,17 +90,23 @@ struct diff_stats_t* diff_stats_parser(const char* str, long* counter, int* err)
   struct diff_stats_t* head = NULL;
 
   while (*text) {
-    if (diff_stats_is_diff_header(text, column)) {
+    int type = diff_stats_line_type(text);
+
+    switch (type) {
+    case DIFF_HEADER: {
       if (index + 1 <= count) {
         count += 12;
-        diff = (struct diff_stats_t*)realloc(diff, sizeof(struct diff_stats_t) * count);
+        diff = (struct diff_stats_t*)realloc(diff,
+                                             sizeof(struct diff_stats_t) * count);
       }
       head = diff_stats_prepare_item(diff + index);
       head->starts_at = (long)(text - hold);
       index++;
-    }
 
-    if (diff_stats_is_hunk_header(text, column)) {
+      text = diff_stats_find_hunk(text);
+      continue;
+    } break;
+    case HUNK_HEADER: {
       if (!head) {
         *err = HUNK_WITHOUT_DIFF;
         free(diff);
@@ -82,14 +114,16 @@ struct diff_stats_t* diff_stats_parser(const char* str, long* counter, int* err)
         goto diff_stats_end;
       }
       diff_stats_add_hunk_at(head, (long)(text - hold));
+    } break;
+    case ADDITION_LINE: { head->additions++; goto diff_stats_skip; } break;
+    case DELETION_LINE: { head->deletions++; goto diff_stats_skip; } break;
+    default: {
+diff_stats_skip:
+      while (*text && *text != '\n') text++;
+    }
     }
 
-    if (*text == '\n') {
-      column = 0;
-    } else {
-      column++;
-    }
-    ++text;
+    text++;
   }
 
   *err = 0;
